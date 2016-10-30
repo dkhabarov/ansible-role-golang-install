@@ -1,0 +1,5 @@
+---
+golang_version: 1.7.3
+golang_state: present
+golang_arch: "{{ 'amd64' if ansible_machine == 'x86_64' else ''}}"
+golang_tarball_filename: "go{{golang_version}}.{{ansible_system|lower}}-{{golang_arch}}.tar.gz"

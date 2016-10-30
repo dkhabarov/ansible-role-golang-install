@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: Denis Khabarov
+  description: Ansible role for installs GoLang
+  license: GPLv3
+  min_ansible_version: 1.4
+  categories:
+  - development
+dependencies: []
+

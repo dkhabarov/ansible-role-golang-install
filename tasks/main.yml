@@ -1,0 +1,98 @@
+---
+- name: install packages
+  apt:
+    pkg: "{{ item }}"
+  with_items:
+    - ca-certificates
+    - git
+  when: golang_state == 'present'
+
+- name: Check if golang is installed
+  stat:
+    path: /usr/local/go/bin/go
+  register: go_exists
+
+- name: Register the current Go version
+  command: /usr/local/go/bin/go version
+  ignore_errors: yes
+  register: go_version
+  changed_when: false
+  when:
+    - golang_state == 'present'
+    - go_exists.stat.exists is defined and go_exists.stat.exists
+
+- name: download Go tarball
+  get_url:
+    url: "https://storage.googleapis.com/golang/{{golang_tarball_filename}}"
+    dest: "/usr/local/src/{{golang_tarball_filename}}"
+  when: golang_state == 'present'
+
+- name: Remove old installation
+  file:
+    path: /usr/local/go
+    state: absent
+  when:
+    - golang_state == 'present'
+    - go_exists.stat.exists is defined and go_exists.stat.exists != False
+    - golang_version | version_compare("{{ go_version.stdout | regex_replace('^go\\sversion\\sgo(?P<goversion>.+)\\s(?P<platform>.+)',  '\\g<goversion>') }}",'!=')
+
+- name: Extract the Go tarball if Go is not yet installed
+  unarchive:
+    src: "/usr/local/src/{{golang_tarball_filename}}"
+    dest: /usr/local
+    copy: no
+  when:
+    - golang_state == 'present'
+    - go_exists.stat.exists is defined and not go_exists.stat.exists
+
+- name: Extract the Go tarball if Go is not the desired version
+  unarchive:
+    src: "/usr/local/src/{{golang_tarball_filename}}"
+    dest: /usr/local
+    copy: no
+  when:
+    - golang_state == 'present'
+    - go_exists.stat.exists is defined and go_exists.stat.exists
+    - golang_version | version_compare("{{ go_version.stdout | regex_replace('^go\\sversion\\sgo(?P<goversion>.+)\\s(?P<platform>.+)',  '\\g<goversion>') }}",'!=')
+
+- name: installs shell vars
+  template:
+    src: etc/profile.d/golang.sh.j2
+    dest: /etc/profile.d/golang.sh
+    mode: 0644
+    owner: root
+    group: root
+  when:
+    - golang_state == 'present'
+
+#- name: find tarballs
+#  find:
+#    paths: "/usr/local/src"
+#    patterns: "go*.tar.gz"
+#  register: go_tarballs
+#  when: golang_state == 'absent'
+
+- name: find tarballs
+  shell: ls /usr/local/src/go*.tar.gz
+  register: go_tarballs
+  when: golang_state == 'absent'
+  ignore_errors: yes
+  changed_when: false
+
+- name: purge golang tarballs
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - "{{ go_tarballs.stdout_lines }}"
+  when: golang_state == 'absent'
+
+- name: purge golang
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - /etc/profile.d/golang.sh
+    - /usr/local/go
+#    - "{{ go_tarballs.files }}"
+  when: golang_state == 'absent'
